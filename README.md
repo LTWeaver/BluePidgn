@@ -6,6 +6,9 @@ It has many different functions such as:
 * DDoS attacks
 * Bot handling
 
+# Setup
+Change the ```[YOUR_IP]```'s in the client.pyw file to your C2 server IP
+
 # How to run
 ```python3 c2server.py```
 
