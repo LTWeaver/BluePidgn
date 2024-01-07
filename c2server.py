@@ -71,7 +71,18 @@ def accept_clients(server_socket):
 
 def send_messages():
     while True:
-        print(f"Bots Connected: {len(connected_clients)}")
+        print(f"""
+  ____  _              _____ _     _             
+ |  _ \| |            |  __ (_)   | |            
+ | |_) | |_   _  ___  | |__) |  __| | __ _ _ __  
+ |  _ <| | | | |/ _ \ |  ___/ |/ _` |/ _` | '_ \ 
+ | |_) | | |_| |  __/ | |   | | (_| | (_| | | | |
+ |____/|_|\__,_|\___| |_|   |_|\__,_|\__, |_| |_|
+                                       __/ |      
+                                      |___/       
+              
+              Made by: https://github.com/LTWeaver
+\n\nBots Connected: {len(connected_clients)}""")
         message_to_send = input("\n\n\n>>>: ")
         os.system('clear')
 
