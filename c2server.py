@@ -10,39 +10,37 @@ clients_lock = threading.Lock()
 
 def handle_client(client_socket, address):
     print(f"[+] Connection from {address}")
-
-    # Add the client socket to the list of connected clients
     with clients_lock:
         connected_clients.append(client_socket)
-
+    
     while True:
         try:
-            message = client_socket.recv(1024).decode()
-            if message == "":
+            message = client_socket.recv(1024).decode('utf-8')
+            if not message:
                 print(f"[-] Connection with {address} closed.")
                 break
-
             print(f"[+] Received from {address}: {message}")
-
         except ConnectionResetError:
             print(f"[-] Connection with {address} closed.")
             break
 
-    # Remove the client socket from the list of connected clients
     with clients_lock:
         if client_socket in connected_clients:
             connected_clients.remove(client_socket)
     client_socket.close()
     print(f"[-] Connection with {address} closed.")
 
+
+
 def send_message_to_clients(message):
-    # Send the same message to all connected clients
-    for client_socket in connected_clients:
-        try:
-            client_socket.send(message.encode())
-        except:
-            # Remove the client socket if there is an issue sending the message
-            connected_clients.remove(client_socket)
+    with clients_lock:
+        for client_socket in connected_clients:
+            try:
+                client_socket.send(message.encode('utf-8'))
+            except:
+                connected_clients.remove(client_socket)
+
+
 
 def start_server():
     host = '0.0.0.0'
@@ -156,15 +154,17 @@ def send_messages():
             send_message_to_clients(message_to_send)
 
 def send_message_to_client(target_ip, message):
-    for client_socket in connected_clients:
-        client_address = client_socket.getpeername()[0]
-        if client_address == target_ip:
-            try:
-                client_socket.send(message.encode())
-            except:
-                # Remove the client socket if there is an issue sending the message
-                connected_clients.remove(client_socket)
-            break  # Stop iterating after sending the message to the specified client
+    with clients_lock:
+        for client_socket in connected_clients:
+            client_address = client_socket.getpeername()[0]
+            if client_address == target_ip:
+                try:
+                    client_socket.send(message.encode('utf-8'))
+                except:
+                    connected_clients.remove(client_socket)
+                break
+
+
 
 def remove_client(selected_client):
     if selected_client.lower() == 'all':
